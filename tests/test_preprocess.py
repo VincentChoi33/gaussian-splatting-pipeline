@@ -1,0 +1,40 @@
+import pytest
+import numpy as np
+from pathlib import Path
+
+
+def test_compute_blur_score():
+    from pipeline.preprocess import compute_blur_score
+    sharp = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    blurry = np.ones((100, 100, 3), dtype=np.uint8) * 128
+    assert compute_blur_score(sharp) > compute_blur_score(blurry)
+
+
+def test_is_video_file(tmp_path):
+    from pipeline.preprocess import is_video
+    assert is_video(Path("test.mp4")) is False  # file doesn't exist
+    assert not is_video(Path("test.jpg"))
+    assert not is_video(Path("images/"))
+    # positive case: a real file with a video extension
+    real_mp4 = tmp_path / "clip.mp4"
+    real_mp4.touch()
+    assert is_video(real_mp4) is True
+    # real file with non-video extension → False
+    real_jpg = tmp_path / "photo.jpg"
+    real_jpg.touch()
+    assert is_video(real_jpg) is False
+
+
+def test_filter_blurry_frames(tmp_path):
+    from pipeline.preprocess import filter_blurry_frames
+    import cv2
+
+    for i in range(8):
+        img = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+        cv2.imwrite(str(tmp_path / f"frame_{i:04d}.jpg"), img)
+    for i in range(8, 10):
+        img = np.ones((100, 100, 3), dtype=np.uint8) * 128
+        cv2.imwrite(str(tmp_path / f"frame_{i:04d}.jpg"), img)
+
+    kept = filter_blurry_frames(tmp_path, percentile=20)
+    assert len(kept) == 8
